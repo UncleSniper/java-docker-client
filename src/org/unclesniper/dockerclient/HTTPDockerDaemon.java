@@ -26,20 +26,27 @@ public class HTTPDockerDaemon implements DockerDaemon {
 		this.baseURL = baseURL;
 	}
 
-	public void performRequest(String endpoint, JSONRequest request, JSONSink response)
-			throws IOException, MalformedJSONException {
-		URL url = new URL(baseURL + endpoint);
-		URLConnection conn = url.openConnection();
-		if(request != null)
+	public void performRequest(String endpoint, ParameterRequest paramRequest, JSONRequest jsonRequest,
+			JSONSink response) throws IOException {
+		URLBuilder url = new URLBuilder(baseURL);
+		url.add(endpoint);
+		if(paramRequest != null)
+			paramRequest.setParameters(url);
+		URLConnection conn = url.toURL().openConnection();
+		if(jsonRequest != null)
 			conn.setDoOutput(true);
 		conn.connect();
-		if(request != null) {
+		if(jsonRequest != null) {
 			try(OutputStream os = conn.getOutputStream()) {
-				request.sendRequest(new JSONPrinter(os));
+				jsonRequest.sendRequest(new JSONPrinter(os));
 			}
 		}
 		try(InputStream is = conn.getInputStream()) {
 			new JSONParser(response).pullSerial(is);
+		}
+		catch(MalformedJSONException mje) {
+			throw new IOException("Bad JSON response from docker daemon '"
+					+ baseURL + "': " + mje.getMessage(), mje);
 		}
 	}
 
